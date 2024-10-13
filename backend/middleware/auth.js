@@ -7,6 +7,7 @@ const authenticationMid = async (req, res, next) => {
         return res.status(500).json({message:"erişim için lütfen olunuz !!!"})
     }
     const decodedData = jwt.verify(token, "SECRETTOKEN");
+    
     if (!decodedData) {
         return res.status(500).json({message:"erişim tokeniniz geçersizdir"})
     }

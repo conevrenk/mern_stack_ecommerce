@@ -1,8 +1,10 @@
 const User = require('../models/user.js')
 const bcrypt = require('bcryptjs')
 const jwt = require('bcryptjs')
-const cloudinary = require('cloudinary').v2;
+const cloudinary = require('cloudinary').v2;mnb m.
 const crypto = require('crypto');
+const nodemailer = require('nodemailer');
+const { format } = require('path');
 
 const register = async (req, res) => {
 
@@ -83,7 +85,7 @@ const forgotPassword = async (req, res) => {
     const resetToken = crypto.randomBytes(20).toString('hex');
 
     user.resetPasswordToken = crypto.createHash('sha256').update(resetToken).digest('hex');
-    user.resetPasswordExpire = new Date(Date.now() + 5 * 60 * 1000);
+    user.resetPasswordExpire = Date.now() + 15 * 60 * 1000;
     await user.save({ validateBeforeSave: false });
 
     const passwordUrl = `${req.protocol}://${req.get('host')}/reset/${resetToken}`
@@ -91,6 +93,25 @@ const forgotPassword = async (req, res) => {
     const message = `Şifreni sıfırlamak için kullanacagın token: ${passwordUrl}`
     
     try {
+        const transporter = nodemailer.createTransport({
+            port: 465,
+            service: "gmail",
+            host: "smtp.gmail.com",
+            auth: {
+                user: 'evrenkbedirhan@gmail.com',
+                pass: 'password',
+            },
+            secure: true,
+        });
+        const mailData = {
+            from: "evrenkbedirhan@gmail.com",
+            to: request.body.email,
+            subject: "şifre sıfırlama",
+            text: message,
+        };
+        await transporter.sendMail(mailData);
+        res.status(200).json({ message: "Mailinize sıfırlama linki gönderildi" })
+
     } catch (error) {
        user.resetPasswordToken=undefined
         user.resetPasswordExpire = undefined
@@ -104,6 +125,35 @@ const forgotPassword = async (req, res) => {
 }
 
 const resetPassword = async (req, res) => {
+    const resetPasswordToken = crypto.createHash('sha256').update(req.params.token).digest('hex');
+    const user = await User.findOne({
+        resetPasswordToken,
+        resetPasswordExpire:{$gt:Date.now()}
+    });
+    if (!user) {
+        return res.status(500).json({message:"Gecersiz tokené!!"})
+    }
+    user.password = req.body.password;
+    user.resetPasswordExpire = undefined;
+    user.resetPasswordToken = undefined;
+
+    await user.save();
+    const token = jwt.sign({ id: user._id }, "SECRETTOKEN", { expiresIn: "1h" });
+    const cookieOptions = {
+        httpOnly: true,
+        expires: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000)
+    }
+        res.status(200).cookie("token", token, cookieOptions).json({
+            user,
+            token
+        })
+    
+}
+const userDetail = async (req, res, next) => {
+    const user = await User.findById(req.params.id);
+    res.status(200).json({
+        user
+    })
 
 }
-module.exports ={register,login,logout,forgotPassword,resetPassword,}
+module.exports ={register,login,logout,forgotPassword,resetPassword,userDetail}

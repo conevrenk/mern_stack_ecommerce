@@ -45,7 +45,8 @@ const createPRoduct = async (req, res,next) => {
             url: result.secure_url
         })
     }
-    req.body.images=allImage
+    req.body.images = allImage
+    req.body.user=req.user.id
     const product = await Product.create(req.body);
     res.status(201).json({
         product
